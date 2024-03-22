@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-TimeMachine Clock Controller 1.1.4
+TimeMachine Clock Controller 1.1.5
 Created on Wed September 13 8:50:00 2023
 
 @author: TOSmith
@@ -10,6 +10,10 @@ import wx, pickle, webbrowser, logging, keyboard, os, win32api
 from ObjectListView import ObjectListView, ColumnDefn
 import subprocess as sp
 import TMCClocks as TM
+import argparse
+import socket
+import threading
+from zeroconf import IPVersion, ServiceInfo, Zeroconf, ServiceBrowser
 
 '''Right-click context menu that appears in the config window to exclude or
 include certain clocks when using Alt+Click'''
@@ -501,6 +505,75 @@ class Controller(wx.Frame):
         self.Layout()
         self.Show()
         self.on_launch(wx.Event)
+        
+        '''Zeroconf listening class'''
+        class MyListener:
+            def remove_service(self, zeroconf, type, name):
+                print("Service %s removed" % (name,))
+
+            def add_service(self, zeroconf, type, name):
+                if name == "TimeMachine Clock Controller._http._tcp.local.":
+                    info = zeroconf.get_service_info(type, name)
+                    if info:
+                        print("Found service:", name)
+                        addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
+                        print("IP addresses:", addresses)
+                    for hosts in addresses:
+                        self.client_program(hosts)
+                    zeroconf.close()
+    
+    '''Cross-Machine Comms'''
+    def find_services(self):
+        zeroconf = Zeroconf()
+        listener = self.MyListener()
+        browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
+    
+    
+    def announce_service(self):
+        sock = socket.gethostname()
+        ip = socket.gethostbyname(sock)
+        logging.basicConfig(level=logging.DEBUG)
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--debug', action='store_true')
+        version_group = parser.add_mutually_exclusive_group()
+        version_group.add_argument('--v6', action='store_true')
+        version_group.add_argument('--v6-only', action='store_true')
+        args = parser.parse_args()
+
+        if args.debug:
+            logging.getLogger('zeroconf').setLevel(logging.DEBUG)
+        if args.v6:
+            ip_version = IPVersion.All
+        elif args.v6_only:
+            ip_version = IPVersion.V6Only
+        else:
+            ip_version = IPVersion.V4Only
+
+        desc = {'path': '/~timemachine/'}
+
+        info = ServiceInfo(
+            "_http._tcp.local.",
+            "TimeMachine Clock Controller._http._tcp.local.",
+            addresses=[socket.inet_aton(ip)],
+            port=80,
+            properties=desc,
+            server="ash-2.local.",
+        )
+
+        self.zeroconf = Zeroconf(ip_version=ip_version)
+        self.zeroconf.register_service(info)
+        #zeroconf.unregister_service(info)
+        #zeroconf.close()
+    
+    '''Find service and send data.'''
+    def client_program(self, host):
+        port = 5000
+        client_socket = socket.socket()
+        client_socket.connect((host,port))
+        message = "Test message."
+        client_socket.send(message.encode())
+        client_socket.close()
     
     '''Functions for control buttons.'''
     #Returns a total number of seconds as milliseconds

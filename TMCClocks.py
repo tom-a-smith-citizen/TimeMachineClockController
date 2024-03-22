@@ -16,6 +16,7 @@ that changes can be made more quickly and efficiently if necessary.
 """
 
 from datetime import datetime, timedelta
+import dateparser
 import socket
 import struct
 
@@ -56,16 +57,19 @@ class clock(object):
     
     #Send a command to the clock.
     def command(self, command):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(5)
-        sock.sendto(bytes(command), (self.ip, self.UDP_PORT))
-        reply = sock.recv(40)
-        #print(reply)
-        if reply:
-            return reply
-            sock.close()
-        else:
-            sock.close()
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(5)
+            sock.sendto(bytes(command), (self.ip, self.UDP_PORT))
+            reply = sock.recv(40)
+            if reply:
+                sock.close()
+                return reply
+            else:
+                sock.close()
+                return None
+        except Exception as e:
+            return e
     
     #Get and store the info from the clock.
     def get_info(self):
