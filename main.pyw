@@ -280,13 +280,14 @@ class BrightnessFrame(wx.Frame):
 
 class Controller(wx.Frame):
     def __init__(self):
-        super().__init__(parent=None, title="TimeMachine Clock Controller 1.1.4")
-        self.title = "TimeMachine Clock Controller 1.1.4"
+        super().__init__(parent=None, title="TimeMachine Clock Controller 1.1.5")
+        self.title = "TimeMachine Clock Controller 1.1.5"
         self.SetIcon(wx.Icon('icon256.ico'))
         self.SetTitle(self.title)
         self.SetMinSize((700,350))
         self.SetInitialSize((700,350))
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        sock = socket.gethostname()
         
         '''Real Time Timer'''
         self.timer_enabled = True
@@ -503,12 +504,14 @@ class Controller(wx.Frame):
         
         self.panel.SetSizer(self.wrapper)
         self.Layout()
+        threading.Thread(target=self.announce_service,daemon=True).start()
+        threading.Thread(target=self.host_program,args=[sock],daemon=True).start()
         self.Show()
         self.on_launch(wx.Event)
         
         '''Zeroconf listening class'''
         class MyListener:
-            def remove_service(self, zeroconf, type, name):
+            def update_service(self, zeroconf, type, name):
                 print("Service %s removed" % (name,))
 
             def add_service(self, zeroconf, type, name):
@@ -552,7 +555,7 @@ class Controller(wx.Frame):
 
         desc = {'path': '/~timemachine/'}
 
-        info = ServiceInfo(
+        self.info = ServiceInfo(
             "_http._tcp.local.",
             "TimeMachine Clock Controller._http._tcp.local.",
             addresses=[socket.inet_aton(ip)],
@@ -562,18 +565,55 @@ class Controller(wx.Frame):
         )
 
         self.zeroconf = Zeroconf(ip_version=ip_version)
-        self.zeroconf.register_service(info)
-        #zeroconf.unregister_service(info)
-        #zeroconf.close()
+        self.zeroconf.register_service(self.info)
     
     '''Find service and send data.'''
     def client_program(self, host):
         port = 5000
         client_socket = socket.socket()
         client_socket.connect((host,port))
-        message = "Test message."
+        message = "QUIT"
         client_socket.send(message.encode())
         client_socket.close()
+        
+    '''Host to receive socket data.'''
+    def host_program(self, host):
+        # get the hostname
+        host = socket.gethostname()
+        port = 5000  # initiate port no above 1024
+
+        server_socket = socket.socket()  # get instance
+        # look closely. The bind() function takes tuple as argument
+        server_socket.bind((host, port))  # bind host address and port together
+
+        # configure how many client the server can listen simultaneously
+        server_socket.listen(2)
+        conn, address = server_socket.accept()  # accept new connection
+        print("Connection from: " + str(address))
+        while True:
+            # receive data stream. it won't accept data packet greater than 1024 bytes
+            data = conn.recv(1024).decode()
+            if not data:
+                # if data is not received break
+                break
+            if data == "Test Message":
+                print('Test message action triggered.')
+                dlg = wx.MessageDialog(self,f'Test data received successfully from {address}','Data Received',wx.OK|wx.ICON_INFORMATION)
+                dlg.ShowModal()
+            elif data == "QUIT":
+                timer_status = self.red_timer.IsRunning()
+                if timer_status == True:
+                    self.red_timer.Stop()
+                timer_status = self.real_timer.IsRunning()
+                if timer_status == True:
+                    self.real_timer.Stop()
+                print('Timers stopped.')
+
+        conn.close()  # close the connection
+    
+    def stop_timers(self):
+        self.listener = self.MyListener()
+        self.listener.add_service()
     
     '''Functions for control buttons.'''
     #Returns a total number of seconds as milliseconds
@@ -583,6 +623,7 @@ class Controller(wx.Frame):
     
     #Runs timer
     def on_timer(self, event):
+        threading.Thread(target=self.stop_timers,daemon=True)
         timer = event.GetEventObject()
         timer = timer.GetName()
         print(timer)
@@ -960,6 +1001,8 @@ class Controller(wx.Frame):
         pickle.dump([countdown, timer, self.last_opened, self.timer_enabled, 
                      self.reset_delay, self.red_enabled, self.excluded], outfile)
         outfile.close()
+        self.zeroconf.unregister_service(self.info)
+        self.zeroconf.close()
         self.Destroy()
     
     #Gets and loads info when program launches

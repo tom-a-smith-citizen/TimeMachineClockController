@@ -1,0 +1,10 @@
+03/25/2024 10:42:24 AM Using proactor: IocpProactor
+03/25/2024 10:42:24 AM Error loading clock info: [Errno 2] No such file or directory: 'clocks'
+03/25/2024 10:42:24 AM Error loading UDP port info: [Errno 2] No such file or directory: 'udp_port'
+03/25/2024 10:42:24 AM Error loading custom buttons: expected str, bytes or os.PathLike object, not NoneType
+03/25/2024 10:42:33 AM Using proactor: IocpProactor
+03/25/2024 10:42:33 AM Error loading clock info: [Errno 2] No such file or directory: 'clocks'
+03/25/2024 10:42:33 AM Error loading UDP port info: [Errno 2] No such file or directory: 'udp_port'
+03/25/2024 10:42:33 AM Error loading custom buttons: expected str, bytes or os.PathLike object, not NoneType
+03/25/2024 10:43:16 AM Using proactor: IocpProactor
+03/25/2024 10:43:16 AM Error loading custom buttons: expected str, bytes or os.PathLike object, not NoneType
